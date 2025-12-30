@@ -1,0 +1,15 @@
+{
+  "name": "peer-mentorship-platform",
+  "version": "1.0.0",
+  "description": "Peer Mentorship and Real-Time Academic Support Platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
