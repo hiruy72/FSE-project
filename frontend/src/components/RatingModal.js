@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ratingAPI } from '../services/api';
-import { useAuth } from '../context/DemoAuthContext';
+import { useAuth } from '../context/AuthContextNew';
 import { Star, X, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 

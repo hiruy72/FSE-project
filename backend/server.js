@@ -6,6 +6,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+// Import database and initialization
+const { initializeDatabase } = require('./src/config/database');
+const { initializeDatabase: initSchema } = require('./src/utils/initDatabase');
+
 const app = require('./src/app');
 
 const server = http.createServer(app);
@@ -57,8 +61,33 @@ io.on('connection', (socket) => {
 // Make io accessible to routes
 app.set('io', io);
 
-const PORT = process.env.PORT || 5000;
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    console.log('🚀 Starting Peer Mentorship Platform...');
+    
+    // Initialize database connection
+    console.log('📊 Connecting to Neon PostgreSQL...');
+    await initializeDatabase();
+    
+    // Initialize database schema
+    console.log('🔧 Setting up database schema...');
+    await initSchema();
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    const PORT = process.env.PORT || 5000;
+    
+    server.listen(PORT, () => {
+      console.log('✅ Server running successfully!');
+      console.log(`🌐 Frontend URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+      console.log(`🔗 API URL: http://localhost:${PORT}/api`);
+      console.log(`📊 Database: Neon PostgreSQL`);
+      console.log(`🔐 Auth: JWT`);
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

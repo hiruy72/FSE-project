@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // Context Providers
-import { AuthProvider } from './context/DemoAuthContext';
+import { AuthProvider } from './context/AuthContextNew';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -20,6 +20,7 @@ import CourseListingPage from './pages/CourseListingPage';
 import MessagesPage from './pages/MessagesPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
+import AskQuestionPage from './pages/AskQuestionPage';
 
 function App() {
   return (
@@ -97,6 +98,14 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ProfilePage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/ask-question" element={
+              <ProtectedRoute>
+                <Layout>
+                  <AskQuestionPage />
                 </Layout>
               </ProtectedRoute>
             } />

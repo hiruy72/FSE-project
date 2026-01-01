@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { courseAPI, userAPI } from '../services/api';
-import { getDemoMentors, getDemoCourses } from '../utils/demoData';
 import { 
   Search, 
   BookOpen, 
@@ -25,16 +24,6 @@ const CourseListingPage = () => {
 
   const fetchData = async () => {
     try {
-      // Use demo data in development mode
-      if (process.env.NODE_ENV === 'development') {
-        const demoCourses = getDemoCourses();
-        const demoMentors = getDemoMentors();
-        
-        setCourses(demoCourses);
-        setMentors(demoMentors);
-        return;
-      }
-
       const [coursesResponse, mentorsResponse] = await Promise.all([
         courseAPI.getCourses(),
         userAPI.getMentors()
@@ -44,12 +33,7 @@ const CourseListingPage = () => {
       setMentors(mentorsResponse.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      // Fallback to demo data on error
-      const demoCourses = getDemoCourses();
-      const demoMentors = getDemoMentors();
-      
-      setCourses(demoCourses);
-      setMentors(demoMentors);
+      toast.error('Failed to load courses');
     } finally {
       setLoading(false);
     }

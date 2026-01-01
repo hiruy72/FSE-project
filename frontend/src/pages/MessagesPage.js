@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/DemoAuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContextNew';
 import { sessionAPI } from '../services/api';
 import { 
   MessageCircle, 
@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 
 const MessagesPage = () => {
   const { userData, getIdToken } = useAuth();
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, active, completed, requested
@@ -26,65 +27,81 @@ const MessagesPage = () => {
 
   const fetchSessions = async () => {
     try {
-      // In demo mode, create some mock sessions
-      const mockSessions = [
-        {
-          id: 'session-1',
-          mentorId: 'demo-mentor-1',
-          menteeId: userData?.uid === 'demo-mentor-1' ? 'demo-student-aau' : 'demo-mentor-1',
-          status: 'active',
-          startedAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-          lastMessage: {
-            text: 'Thanks for the help with React hooks!',
-            timestamp: new Date(Date.now() - 5 * 60 * 1000),
-            senderId: userData?.uid === 'demo-mentor-1' ? 'demo-student-aau' : 'demo-mentor-1'
-          },
-          otherUser: {
-            name: userData?.uid === 'demo-mentor-1' ? 'Hiruy Tesfaye' : 'Sarah Chen',
-            role: userData?.uid === 'demo-mentor-1' ? 'mentee' : 'mentor'
-          }
-        },
-        {
-          id: 'session-2',
-          mentorId: 'demo-mentor-2',
-          menteeId: userData?.uid === 'demo-mentor-2' ? 'demo-student-1' : 'demo-mentor-2',
-          status: 'completed',
-          startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-          endedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // 1 hour session
-          lastMessage: {
-            text: 'Great session! The Python concepts are much clearer now.',
-            timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 55 * 60 * 1000),
-            senderId: userData?.uid === 'demo-mentor-2' ? 'demo-student-1' : 'demo-mentor-2'
-          },
-          otherUser: {
-            name: userData?.uid === 'demo-mentor-2' ? 'Demo Student' : 'Alex Rodriguez',
-            role: userData?.uid === 'demo-mentor-2' ? 'mentee' : 'mentor'
-          }
-        },
-        {
-          id: 'session-3',
-          mentorId: 'demo-mentor-3',
-          menteeId: userData?.uid === 'demo-mentor-3' ? 'demo-student-aau' : 'demo-mentor-3',
-          status: 'requested',
-          createdAt: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-          otherUser: {
-            name: userData?.uid === 'demo-mentor-3' ? 'Hiruy Tesfaye' : 'Jessica Kim',
-            role: userData?.uid === 'demo-mentor-3' ? 'mentee' : 'mentor'
-          }
+      const token = await getIdToken();
+      
+      // Fetch active sessions
+      const activeResponse = await sessionAPI.getActiveSessions(token);
+      const activeSessions = activeResponse.data || [];
+
+      // Fetch pending sessions (for mentors)
+      let pendingSessions = [];
+      if (userData?.role === 'mentor') {
+        try {
+          const pendingResponse = await sessionAPI.getPendingSessions(token);
+          pendingSessions = pendingResponse.data || [];
+        } catch (error) {
+          console.log('No pending sessions or error fetching them');
         }
+      }
+
+      // Fetch recent completed sessions
+      const recentResponse = await sessionAPI.getSessionLogs({ limit: 10 }, token);
+      const recentSessions = recentResponse.data || [];
+
+      // Combine all sessions
+      const allSessions = [
+        ...activeSessions.map(session => ({
+          ...session,
+          status: 'active',
+          otherUser: {
+            name: session.otherUser || (userData?.role === 'mentor' ? 'Student' : 'Mentor'),
+            role: userData?.role === 'mentor' ? 'mentee' : 'mentor'
+          }
+        })),
+        ...pendingSessions.map(session => ({
+          ...session,
+          status: 'requested',
+          otherUser: {
+            name: session.menteeName || 'Student',
+            role: 'mentee'
+          }
+        })),
+        ...recentSessions.map(session => ({
+          ...session,
+          status: 'completed',
+          otherUser: {
+            name: session.otherUser || (userData?.role === 'mentor' ? 'Student' : 'Mentor'),
+            role: userData?.role === 'mentor' ? 'mentee' : 'mentor'
+          }
+        }))
       ];
 
-      // Filter sessions based on user role
-      const userSessions = mockSessions.filter(session => 
-        session.mentorId === userData?.uid || session.menteeId === userData?.uid
-      );
+      setSessions(allSessions);
 
-      setSessions(userSessions);
     } catch (error) {
       console.error('Error fetching sessions:', error);
       toast.error('Failed to load messages');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAcceptSession = async (sessionId) => {
+    try {
+      const token = await getIdToken();
+      await sessionAPI.acceptSession(sessionId, {}, token);
+      toast.success('Session accepted! Redirecting to chat...');
+      
+      // Refresh sessions
+      fetchSessions();
+      
+      // Navigate to chat after a short delay
+      setTimeout(() => {
+        navigate(`/chat/${sessionId}`);
+      }, 1000);
+    } catch (error) {
+      console.error('Error accepting session:', error);
+      toast.error('Failed to accept session');
     }
   };
 
@@ -95,7 +112,7 @@ const MessagesPage = () => {
     }
 
     // Filter by search term
-    if (searchTerm && !session.otherUser.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+    if (searchTerm && !session.otherUser?.name?.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
 
@@ -248,7 +265,10 @@ const MessagesPage = () => {
                     )}
 
                     {session.status === 'requested' && userData?.role === 'mentor' && (
-                      <button className="btn-primary text-xs px-3 py-1">
+                      <button 
+                        onClick={() => handleAcceptSession(session.id)}
+                        className="btn-primary text-xs px-3 py-1"
+                      >
                         Accept Request
                       </button>
                     )}

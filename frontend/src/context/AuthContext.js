@@ -26,6 +26,11 @@ export const AuthProvider = ({ children }) => {
   // Register user
   const register = async (email, password, firstName, lastName, role = 'mentee') => {
     try {
+      // Validate Addis Ababa University email - must end with @aau.edu.et
+      if (!email.toLowerCase().endsWith('@aau.edu.et')) {
+        throw new Error('Please use your Addis Ababa University email address ending with @aau.edu.et');
+      }
+
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -55,6 +60,11 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (email, password) => {
     try {
+      // Validate Addis Ababa University email - must end with @aau.edu.et
+      if (!email.toLowerCase().endsWith('@aau.edu.et')) {
+        throw new Error('Please use your Addis Ababa University email address ending with @aau.edu.et');
+      }
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential;
     } catch (error) {

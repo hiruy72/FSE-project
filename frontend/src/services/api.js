@@ -79,6 +79,10 @@ export const questionAPI = {
   }),
   getQuestions: (params = {}) => apiService.get('/questions', { params }),
   getQuestion: (id) => apiService.get(`/questions/${id}`),
+  getQuestionsForMentor: (mentorId, params = {}) => apiService.get(`/questions/for-mentor/${mentorId}`, { params }),
+  answerQuestion: (id, answerData, token) => apiService.post(`/questions/${id}/answer`, answerData, {
+    headers: { Authorization: `Bearer ${token}` }
+  }),
   updateQuestion: (id, questionData, token) => apiService.put(`/questions/${id}`, questionData, {
     headers: { Authorization: `Bearer ${token}` }
   }),
@@ -98,6 +102,9 @@ export const sessionAPI = {
     headers: { Authorization: `Bearer ${token}` }
   }),
   getActiveSessions: (token) => apiService.get('/sessions/active', {
+    headers: { Authorization: `Bearer ${token}` }
+  }),
+  getPendingSessions: (token) => apiService.get('/sessions/pending', {
     headers: { Authorization: `Bearer ${token}` }
   }),
   getSessionLogs: (params, token) => apiService.get('/sessions/logs', {
@@ -125,6 +132,17 @@ export const ratingAPI = {
   }),
   getMentorRatings: (mentorId, params = {}) => apiService.get(`/ratings/${mentorId}`, { params }),
   getMentorStats: (mentorId) => apiService.get(`/ratings/${mentorId}/stats`),
+};
+
+export const matchingAPI = {
+  findMentors: (tags, courseId, token) => apiService.post('/matching/mentors', { tags, courseId }, {
+    headers: { Authorization: `Bearer ${token}` }
+  }),
+  getAllMentors: (params = {}) => apiService.get('/matching/mentors/all', { params }),
+  getMentorDetails: (mentorId) => apiService.get(`/matching/mentors/${mentorId}`),
+  updateMentorProfile: (profileData, token) => apiService.put('/matching/mentors/profile', profileData, {
+    headers: { Authorization: `Bearer ${token}` }
+  }),
 };
 
 export const adminAPI = {

@@ -1,21 +1,17 @@
 const express = require('express');
-const { db } = require('../config/firebase');
-const { authenticateToken, requireRole } = require('../middlewares/auth');
+const { query } = require('../config/database');
+const { authenticateToken, requireRole } = require('../middlewares/jwtAuth');
 
 const router = express.Router();
 
 // Get all courses
 router.get('/', async (req, res) => {
   try {
-    const coursesSnapshot = await db.collection('courses').orderBy('name').get();
-    const courses = [];
-
-    coursesSnapshot.forEach(doc => {
-      courses.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    const courses = await query(`
+      SELECT id, name, department, description, tags, created_at, updated_at
+      FROM courses
+      ORDER BY name ASC
+    `);
 
     res.json(courses);
   } catch (error) {
@@ -32,23 +28,15 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
   try {
     const { name, department, description, tags } = req.body;
 
-    const courseData = {
-      name,
-      department,
-      description: description || '',
-      tags: tags || [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const docRef = await db.collection('courses').add(courseData);
+    const courseData = await query(`
+      INSERT INTO courses (name, department, description, tags)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, name, department, description, tags, created_at, updated_at
+    `, [name, department, description || '', tags || []]);
 
     res.status(201).json({
       message: 'Course created successfully',
-      course: {
-        id: docRef.id,
-        ...courseData
-      }
+      course: courseData[0]
     });
   } catch (error) {
     console.error('Create course error:', error);
@@ -63,16 +51,28 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
 router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = {
-      ...req.body,
-      updatedAt: new Date()
-    };
+    const { name, department, description, tags } = req.body;
 
-    delete updateData.createdAt;
+    const updatedCourses = await query(`
+      UPDATE courses 
+      SET 
+        name = COALESCE($1, name),
+        department = COALESCE($2, department),
+        description = COALESCE($3, description),
+        tags = COALESCE($4, tags),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5
+      RETURNING *
+    `, [name, department, description, tags, id]);
 
-    await db.collection('courses').doc(id).update(updateData);
+    if (updatedCourses.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
 
-    res.json({ message: 'Course updated successfully' });
+    res.json({ 
+      message: 'Course updated successfully',
+      course: updatedCourses[0]
+    });
   } catch (error) {
     console.error('Update course error:', error);
     res.status(500).json({
@@ -86,7 +86,12 @@ router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) =
 router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    await db.collection('courses').doc(id).delete();
+    
+    const deletedCourses = await query('DELETE FROM courses WHERE id = $1 RETURNING id', [id]);
+    
+    if (deletedCourses.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
 
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {

@@ -1,6 +1,6 @@
 const express = require('express');
 const { db } = require('../config/firebase');
-const { authenticateToken } = require('../middlewares/auth');
+const { authenticateToken } = require('../middlewares/jwtAuth');
 
 const router = express.Router();
 

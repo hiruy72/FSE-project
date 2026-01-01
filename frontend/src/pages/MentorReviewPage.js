@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/DemoAuthContext';
+import { useAuth } from '../context/AuthContextNew';
 import { userAPI, ratingAPI, sessionAPI } from '../services/api';
 import socketService from '../services/socket';
 import { 
@@ -372,7 +372,7 @@ const MentorReviewPage = () => {
                         <div>
                           <p className="font-medium text-white">Anonymous Student</p>
                           <p className="text-dark-400 text-sm">
-                            {new Date(rating.createdAt?.toDate?.() || rating.createdAt).toLocaleDateString()}
+                            {new Date(rating.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

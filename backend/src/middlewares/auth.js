@@ -10,13 +10,6 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Access token required' });
     }
 
-    // Handle demo tokens
-    if (token.startsWith('demo-token-')) {
-      const userId = token.replace('demo-token-', '');
-      req.user = { uid: userId, email: 'demo@example.com' };
-      return next();
-    }
-
     // Verify Firebase ID token
     const decodedToken = await auth.verifyIdToken(token);
     req.user = decodedToken;

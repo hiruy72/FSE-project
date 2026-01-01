@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/DemoAuthContext';
+import { useAuth } from '../context/AuthContextNew';
 import { userAPI, courseAPI } from '../services/api';
 import { 
   User, 

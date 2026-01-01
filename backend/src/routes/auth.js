@@ -9,32 +9,15 @@ router.post('/register', async (req, res) => {
   try {
     const { email, password, firstName, lastName, role = 'mentee' } = req.body;
 
-    // In demo mode, just return success
-    if (process.env.NODE_ENV === 'development' && process.env.FIREBASE_PROJECT_ID === 'demo-project') {
-      const userData = {
-        uid: `demo-${Date.now()}`,
-        email,
-        firstName,
-        lastName,
-        role,
-        approved: role === 'mentee' ? true : false,
-        profile: {
-          bio: '',
-          skills: [],
-          courses: [],
-          availability: []
-        },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      return res.status(201).json({
-        message: 'User registered successfully (demo mode)',
-        user: userData
+    // Validate Addis Ababa University email
+    if (!email.toLowerCase().endsWith('@aau.edu.et')) {
+      return res.status(400).json({ 
+        error: 'Invalid email domain', 
+        message: 'Please use your Addis Ababa University email address ending with @aau.edu.et' 
       });
     }
 
-    // Real Firebase registration
+    // Create user in Firebase Auth
     const userRecord = await auth.createUser({
       email,
       password,
@@ -47,7 +30,7 @@ router.post('/register', async (req, res) => {
       firstName,
       lastName,
       role,
-      approved: role === 'mentee' ? true : false,
+      approved: role === 'mentee' ? true : false, // Mentors need approval
       profile: {
         bio: '',
         skills: [],
@@ -81,26 +64,6 @@ router.post('/register', async (req, res) => {
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // Handle demo mode
-    if (req.user.uid.startsWith('demo-')) {
-      return res.json({
-        uid: req.user.uid,
-        email: req.user.email,
-        firstName: 'Demo',
-        lastName: 'User',
-        role: 'mentee',
-        approved: true,
-        profile: {
-          bio: 'Demo user for testing',
-          skills: ['JavaScript', 'React'],
-          courses: [],
-          availability: []
-        },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    }
-
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     
     if (!userDoc.exists) {

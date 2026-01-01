@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/DemoAuthContext';
+import { useAuth } from '../context/AuthContextNew';
 import { chatAPI, sessionAPI } from '../services/api';
 import socketService from '../services/socket';
 import RatingModal from '../components/RatingModal';
@@ -27,8 +27,13 @@ const ChatPage = () => {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [sessionDuration, setSessionDuration] = useState(null); // in minutes
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [showDurationModal, setShowDurationModal] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const timerIntervalRef = useRef(null);
 
   useEffect(() => {
     if (sessionId) {
@@ -39,6 +44,9 @@ const ChatPage = () => {
       socketService.leaveSession(sessionId);
       socketService.offMessage(handleNewMessage);
       socketService.offTyping(handleTyping);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
     };
   }, [sessionId]);
 
@@ -46,9 +54,48 @@ const ChatPage = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Timer effect for session duration
+  useEffect(() => {
+    if (sessionDuration && sessionStartTime) {
+      timerIntervalRef.current = setInterval(() => {
+        const now = new Date();
+        const elapsed = Math.floor((now - sessionStartTime) / 1000 / 60); // minutes
+        const remaining = sessionDuration - elapsed;
+        
+        setTimeRemaining(remaining);
+        
+        // Auto-end session when time expires
+        if (remaining <= 0) {
+          clearInterval(timerIntervalRef.current);
+          handleSessionTimeExpired();
+        }
+      }, 1000);
+      
+      return () => {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+        }
+      };
+    }
+  }, [sessionDuration, sessionStartTime]);
+
   const initializeChat = async () => {
     try {
       const token = await getIdToken();
+      
+      // Fetch session details
+      const activeSessionsResponse = await sessionAPI.getActiveSessions(token);
+      const currentSession = activeSessionsResponse.data.find(s => s.id === sessionId);
+      
+      if (currentSession) {
+        setSession(currentSession);
+        setSessionStartTime(new Date(currentSession.startedAt));
+        
+        // Check if session has a duration set
+        if (currentSession.duration) {
+          setSessionDuration(currentSession.duration);
+        }
+      }
       
       // Fetch messages
       const messagesResponse = await chatAPI.getMessages(sessionId, {}, token);
@@ -145,6 +192,11 @@ const ChatPage = () => {
     typingTimeoutRef.current = setTimeout(() => {
       socketService.sendStopTyping(sessionId, userData?.uid);
     }, 1000);
+  };
+
+  const handleSessionTimeExpired = async () => {
+    toast.warning('Session time has expired');
+    await endSession();
   };
 
   const endSession = async () => {
@@ -273,7 +325,7 @@ const ChatPage = () => {
                       isOwnMessage ? 'text-primary-200' : 'text-dark-400'
                     }`}
                   >
-                    {formatTime(message.timestamp?.toDate?.() || message.timestamp)}
+                    {formatTime(message.timestamp)}
                   </p>
                 </div>
               </div>
