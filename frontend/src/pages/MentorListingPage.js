@@ -126,12 +126,16 @@ const MentorListingPage = () => {
               <div className="flex items-center space-x-4 text-sm text-dark-400">
                 <div className="flex items-center space-x-1">
                   <Star className="w-4 h-4 text-yellow-500" />
-                  <span>{mentor.averageRating.toFixed(1)}</span>
-                  <span>({mentor.totalRatings} reviews)</span>
+                  <span>{mentor.averageRating?.toFixed(1) || '0.0'}</span>
+                  <span>({mentor.totalRatings || 0} reviews)</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <Users className="w-4 h-4" />
-                  <span>{mentor.totalSessions} sessions</span>
+                  <span>{mentor.studentsHelped || mentor.totalSessions || 0} students</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Clock className="w-4 h-4" />
+                  <span>{Math.floor((mentor.totalMinutes || 0) / 60)}h {(mentor.totalMinutes || 0) % 60}m</span>
                 </div>
               </div>
             </div>

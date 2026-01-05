@@ -1,38 +1,77 @@
 const express = require('express');
-const { db } = require('../config/firebase');
+const { query } = require('../config/database');
 const { authenticateToken } = require('../middlewares/jwtAuth');
 
 const router = express.Router();
 
-// Helper function to update mentor rating stats
+// Helper function to update mentor rating stats and overall statistics
 const updateMentorRatingStats = async (mentorId) => {
   try {
-    const ratingsSnapshot = await db.collection('ratings')
-      .where('mentorId', '==', mentorId)
-      .get();
+    const ratingsResult = await query(
+      'SELECT rating FROM ratings WHERE mentor_id = $1',
+      [mentorId]
+    );
 
     const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let totalRating = 0;
-    let totalRatings = 0;
+    let totalRatings = ratingsResult.length;
 
-    ratingsSnapshot.forEach(doc => {
-      const rating = doc.data().rating;
+    ratingsResult.forEach(row => {
+      const rating = row.rating;
       ratingCounts[rating]++;
       totalRating += rating;
-      totalRatings++;
     });
 
     const averageRating = totalRatings > 0 ? parseFloat((totalRating / totalRatings).toFixed(1)) : 0;
 
-    // Update mentor's profile with new stats
-    await db.collection('users').doc(mentorId).update({
-      'profile.averageRating': averageRating,
-      'profile.totalRatings': totalRatings,
-      'profile.ratingDistribution': ratingCounts,
-      updatedAt: new Date()
-    });
+    // Get other mentor statistics
+    const studentsHelpedResult = await query(
+      'SELECT COUNT(DISTINCT mentee_id) as students_helped FROM sessions WHERE mentor_id = $1 AND status = $2',
+      [mentorId, 'completed']
+    );
+    const studentsHelped = parseInt(studentsHelpedResult[0].students_helped) || 0;
 
-    return { averageRating, totalRatings, ratingDistribution: ratingCounts };
+    const totalMinutesResult = await query(
+      'SELECT COALESCE(SUM(duration), 0) as total_minutes FROM logs WHERE mentor_id = $1',
+      [mentorId]
+    );
+    const totalMinutes = parseInt(totalMinutesResult[0].total_minutes) || 0;
+
+    // Get current profile and update with all statistics
+    const currentProfileResult = await query(
+      'SELECT profile FROM users WHERE id = $1',
+      [mentorId]
+    );
+    
+    const currentProfile = currentProfileResult[0]?.profile || {};
+    const updatedProfile = {
+      ...currentProfile,
+      averageRating,
+      totalRatings,
+      ratingDistribution: ratingCounts,
+      studentsHelped,
+      totalMinutes,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Update mentor's profile with new stats
+    await query(`
+      UPDATE users 
+      SET profile = $1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [
+      JSON.stringify(updatedProfile),
+      mentorId
+    ]);
+
+    return { 
+      averageRating, 
+      totalRatings, 
+      ratingDistribution: ratingCounts,
+      studentsHelped,
+      totalMinutes
+    };
   } catch (error) {
     console.error('Error updating mentor rating stats:', error);
     throw error;
@@ -45,49 +84,66 @@ router.post('/', authenticateToken, async (req, res) => {
     const { sessionId, mentorId, rating, feedback } = req.body;
 
     // Verify session exists and user was the mentee
-    const sessionDoc = await db.collection('sessions').doc(sessionId).get();
+    const sessionResult = await query(
+      'SELECT mentee_id, mentor_id, status FROM sessions WHERE id = $1',
+      [sessionId]
+    );
     
-    if (!sessionDoc.exists) {
+    if (sessionResult.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const sessionData = sessionDoc.data();
+    const sessionData = sessionResult[0];
     
-    if (sessionData.menteeId !== req.user.uid) {
+    if (sessionData.mentee_id !== req.user.uid) {
       return res.status(403).json({ error: 'Only mentees can rate sessions' });
     }
 
-    if (sessionData.status !== 'completed') {
-      return res.status(400).json({ error: 'Session must be completed to rate' });
+    if (sessionData.status !== 'completed' && sessionData.status !== 'pending_rating') {
+      return res.status(400).json({ error: 'Session must be completed or pending rating to rate' });
     }
 
-    if (sessionData.mentorId !== mentorId) {
+    if (sessionData.mentor_id !== mentorId) {
       return res.status(400).json({ error: 'Mentor ID does not match session' });
     }
 
     // Check if rating already exists
-    const existingRatingQuery = await db.collection('ratings')
-      .where('sessionId', '==', sessionId)
-      .where('menteeId', '==', req.user.uid)
-      .get();
+    const existingRatingResult = await query(
+      'SELECT id FROM ratings WHERE session_id = $1 AND mentee_id = $2',
+      [sessionId, req.user.uid]
+    );
 
-    if (!existingRatingQuery.empty) {
+    if (existingRatingResult.length > 0) {
       return res.status(400).json({ error: 'Rating already submitted for this session' });
     }
 
-    const ratingData = {
+    // Insert the rating
+    const ratingResult = await query(`
+      INSERT INTO ratings (session_id, mentee_id, mentor_id, rating, feedback)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, session_id, mentee_id, mentor_id, rating, feedback, created_at
+    `, [
       sessionId,
-      menteeId: req.user.uid,
+      req.user.uid,
       mentorId,
-      rating: Math.max(1, Math.min(5, parseInt(rating))), // Ensure rating is between 1-5
-      feedback: feedback || '',
-      createdAt: new Date()
-    };
+      Math.max(1, Math.min(5, parseInt(rating))), // Ensure rating is between 1-5
+      feedback || ''
+    ]);
 
-    const docRef = await db.collection('ratings').add(ratingData);
+    const newRating = ratingResult[0];
 
     // Auto-update mentor's average rating and stats
     const updatedStats = await updateMentorRatingStats(mentorId);
+
+    // Complete the session if it was pending rating
+    if (sessionData.status === 'pending_rating') {
+      await query(`
+        UPDATE sessions 
+        SET status = 'completed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [sessionId]);
+    }
 
     // Emit real-time update via Socket.IO
     const io = req.app.get('io');
@@ -96,15 +152,22 @@ router.post('/', authenticateToken, async (req, res) => {
         mentorId,
         newRating: updatedStats.averageRating,
         totalRatings: updatedStats.totalRatings,
-        ratingDistribution: updatedStats.ratingDistribution
+        ratingDistribution: updatedStats.ratingDistribution,
+        studentsHelped: updatedStats.studentsHelped,
+        totalMinutes: updatedStats.totalMinutes
       });
     }
 
     res.status(201).json({
       message: 'Rating submitted successfully',
       rating: {
-        id: docRef.id,
-        ...ratingData
+        id: newRating.id,
+        sessionId: newRating.session_id,
+        menteeId: newRating.mentee_id,
+        mentorId: newRating.mentor_id,
+        rating: newRating.rating,
+        feedback: newRating.feedback,
+        createdAt: newRating.created_at
       }
     });
   } catch (error) {
@@ -123,45 +186,63 @@ router.get('/:mentorId', async (req, res) => {
     const { limit = 10, offset = 0 } = req.query;
 
     // Verify mentor exists
-    const mentorDoc = await db.collection('users').doc(mentorId).get();
+    const mentorResult = await query(
+      'SELECT id, role FROM users WHERE id = $1',
+      [mentorId]
+    );
     
-    if (!mentorDoc.exists || mentorDoc.data().role !== 'mentor') {
+    if (mentorResult.length === 0 || mentorResult[0].role !== 'mentor') {
       return res.status(404).json({ error: 'Mentor not found' });
     }
 
-    const ratingsQuery = db.collection('ratings')
-      .where('mentorId', '==', mentorId)
-      .orderBy('createdAt', 'desc')
-      .limit(parseInt(limit))
-      .offset(parseInt(offset));
+    const ratingsResult = await query(`
+      SELECT 
+        r.id,
+        r.session_id,
+        r.mentee_id,
+        r.mentor_id,
+        r.rating,
+        r.feedback,
+        r.created_at,
+        u.first_name,
+        u.last_name
+      FROM ratings r
+      JOIN users u ON r.mentee_id = u.id
+      WHERE r.mentor_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, [mentorId, parseInt(limit), parseInt(offset)]);
 
-    const ratingsSnapshot = await ratingsQuery.get();
-    const ratings = [];
-    let totalRating = 0;
-
-    ratingsSnapshot.forEach(doc => {
-      const ratingData = doc.data();
-      totalRating += ratingData.rating;
-      
-      ratings.push({
-        id: doc.id,
-        ...ratingData
-      });
-    });
+    const ratings = ratingsResult.map(row => ({
+      id: row.id,
+      sessionId: row.session_id,
+      menteeId: row.mentee_id,
+      mentorId: row.mentor_id,
+      rating: row.rating,
+      feedback: row.feedback,
+      createdAt: row.created_at,
+      menteeFirstName: row.first_name,
+      menteeLastName: row.last_name
+    }));
 
     // Calculate average rating
+    let totalRating = 0;
+    ratings.forEach(rating => {
+      totalRating += rating.rating;
+    });
     const averageRating = ratings.length > 0 ? (totalRating / ratings.length).toFixed(1) : 0;
 
     // Get total count of ratings
-    const totalRatingsSnapshot = await db.collection('ratings')
-      .where('mentorId', '==', mentorId)
-      .get();
+    const totalCountResult = await query(
+      'SELECT COUNT(*) as count FROM ratings WHERE mentor_id = $1',
+      [mentorId]
+    );
 
     res.json({
       ratings,
       averageRating: parseFloat(averageRating),
-      totalRatings: totalRatingsSnapshot.size,
-      hasMore: ratingsSnapshot.size === parseInt(limit)
+      totalRatings: parseInt(totalCountResult[0].count),
+      hasMore: ratingsResult.length === parseInt(limit)
     });
   } catch (error) {
     console.error('Get ratings error:', error);
@@ -178,32 +259,56 @@ router.get('/:mentorId/stats', async (req, res) => {
     const { mentorId } = req.params;
 
     // Verify mentor exists
-    const mentorDoc = await db.collection('users').doc(mentorId).get();
+    const mentorResult = await query(
+      'SELECT id, role, profile FROM users WHERE id = $1',
+      [mentorId]
+    );
     
-    if (!mentorDoc.exists || mentorDoc.data().role !== 'mentor') {
+    if (mentorResult.length === 0 || mentorResult[0].role !== 'mentor') {
       return res.status(404).json({ error: 'Mentor not found' });
     }
 
-    const ratingsSnapshot = await db.collection('ratings')
-      .where('mentorId', '==', mentorId)
-      .get();
+    const mentorProfile = mentorResult[0].profile || {};
+
+    // Get fresh statistics if not in profile or outdated
+    const ratingsResult = await query(
+      'SELECT rating FROM ratings WHERE mentor_id = $1',
+      [mentorId]
+    );
 
     const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let totalRating = 0;
 
-    ratingsSnapshot.forEach(doc => {
-      const rating = doc.data().rating;
+    ratingsResult.forEach(row => {
+      const rating = row.rating;
       ratingCounts[rating]++;
       totalRating += rating;
     });
 
-    const totalRatings = ratingsSnapshot.size;
+    const totalRatings = ratingsResult.length;
     const averageRating = totalRatings > 0 ? (totalRating / totalRatings).toFixed(1) : 0;
+
+    // Get students helped count
+    const studentsHelpedResult = await query(
+      'SELECT COUNT(DISTINCT mentee_id) as students_helped FROM sessions WHERE mentor_id = $1 AND status = $2',
+      [mentorId, 'completed']
+    );
+    const studentsHelped = parseInt(studentsHelpedResult[0].students_helped) || 0;
+
+    // Get total minutes
+    const totalMinutesResult = await query(
+      'SELECT COALESCE(SUM(duration), 0) as total_minutes FROM logs WHERE mentor_id = $1',
+      [mentorId]
+    );
+    const totalMinutes = parseInt(totalMinutesResult[0].total_minutes) || 0;
 
     res.json({
       averageRating: parseFloat(averageRating),
       totalRatings,
-      ratingDistribution: ratingCounts
+      ratingDistribution: ratingCounts,
+      studentsHelped,
+      totalMinutes,
+      lastUpdated: mentorProfile.lastUpdated || null
     });
   } catch (error) {
     console.error('Get rating stats error:', error);

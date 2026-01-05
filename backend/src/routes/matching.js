@@ -55,13 +55,18 @@ router.post('/mentors', authenticateToken, async (req, res) => {
       const skillMatches = mentor.skills ? mentor.skills.filter(skill => tags.includes(skill)).length : 0;
       const matchScore = Math.min(100, (skillMatches / tags.length) * 100);
       
+      // Extract statistics from profile if available
+      const profile = mentor.profile || {};
+      
       return {
         ...mentor,
         matchScore: Math.round(matchScore),
         skillMatches: skillMatches,
-        averageRating: parseFloat(mentor.average_rating) || 0,
-        totalRatings: parseInt(mentor.total_ratings) || 0,
-        totalSessions: parseInt(mentor.total_sessions) || 0
+        averageRating: profile.averageRating || parseFloat(mentor.average_rating) || 0,
+        totalRatings: profile.totalRatings || parseInt(mentor.total_ratings) || 0,
+        totalSessions: parseInt(mentor.total_sessions) || 0,
+        studentsHelped: profile.studentsHelped || 0,
+        totalMinutes: profile.totalMinutes || 0
       };
     });
 
@@ -135,14 +140,21 @@ router.get('/mentors/all', async (req, res) => {
       ${whereClause}
     `, params);
 
-    const mentorsFormatted = mentors.map(mentor => ({
-      ...mentor,
-      averageRating: parseFloat(mentor.average_rating) || 0,
-      totalRatings: parseInt(mentor.total_ratings) || 0,
-      totalSessions: parseInt(mentor.total_sessions) || 0,
-      activeSessions: parseInt(mentor.active_sessions) || 0,
-      isAvailable: parseInt(mentor.active_sessions) < 3 // Limit concurrent sessions
-    }));
+    const mentorsFormatted = mentors.map(mentor => {
+      // Extract statistics from profile if available
+      const profile = mentor.profile || {};
+      
+      return {
+        ...mentor,
+        averageRating: profile.averageRating || parseFloat(mentor.average_rating) || 0,
+        totalRatings: profile.totalRatings || parseInt(mentor.total_ratings) || 0,
+        totalSessions: parseInt(mentor.total_sessions) || 0,
+        activeSessions: parseInt(mentor.active_sessions) || 0,
+        studentsHelped: profile.studentsHelped || 0,
+        totalMinutes: profile.totalMinutes || 0,
+        isAvailable: parseInt(mentor.active_sessions) < 3 // Limit concurrent sessions
+      };
+    });
 
     res.json({
       mentors: mentorsFormatted,

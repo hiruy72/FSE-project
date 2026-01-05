@@ -274,9 +274,12 @@ const MessagesPage = () => {
                     )}
 
                     {session.status === 'completed' && (
-                      <span className="text-xs text-green-400">
-                        Session Complete
-                      </span>
+                      <Link
+                        to={`/chat/${session.id}`}
+                        className="btn-secondary text-xs px-3 py-1"
+                      >
+                        View Messages
+                      </Link>
                     )}
                   </div>
                 </div>

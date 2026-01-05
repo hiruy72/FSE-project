@@ -4,31 +4,54 @@ import { useAuth } from '../context/AuthContextNew';
 import { Star, X, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted }) => {
+const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted, mandatory = false }) => {
   const { getIdToken } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Debug session data
+  React.useEffect(() => {
+    if (isOpen) {
+      console.log('RatingModal opened with session:', session);
+    }
+  }, [isOpen, session]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    console.log('Rating submission started:', { rating, feedback, session });
     
     if (rating === 0) {
       toast.error('Please select a rating');
       return;
     }
 
+    if (!session?.id || !session?.mentorId) {
+      console.error('Missing session data:', session);
+      toast.error('Session information is missing. Please try again.');
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log('Getting token...');
       const token = await getIdToken();
-      const response = await ratingAPI.submitRating({
+      console.log('Token received:', token ? 'Present' : 'Missing');
+      
+      const ratingData = {
         sessionId: session.id,
         mentorId: session.mentorId,
         rating,
         feedback
-      }, token);
-
+      };
+      
+      console.log('Submitting rating with data:', ratingData);
+      
+      const response = await ratingAPI.submitRating(ratingData, token);
+      
+      console.log('Rating submission response:', response.data);
       toast.success('Rating submitted successfully!');
       onRatingSubmitted(response.data.rating);
       onClose();
@@ -39,13 +62,25 @@ const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted }) => {
       setFeedback('');
     } catch (error) {
       console.error('Error submitting rating:', error);
-      toast.error('Failed to submit rating');
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to submit rating');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
+    if (mandatory && rating === 0) {
+      toast.error('Rating is required to complete the session');
+      return;
+    }
+    
     setRating(0);
     setHoverRating(0);
     setFeedback('');
@@ -59,13 +94,17 @@ const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted }) => {
       <div className="bg-dark-800 rounded-lg max-w-md w-full p-6 border border-dark-700">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Rate Your Session</h2>
-          <button
-            onClick={handleClose}
-            className="p-2 text-dark-400 hover:text-white transition-colors duration-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="text-xl font-bold text-white">
+            {mandatory ? 'Rate Your Session (Required)' : 'Rate Your Session'}
+          </h2>
+          {!mandatory && (
+            <button
+              onClick={handleClose}
+              className="p-2 text-dark-400 hover:text-white transition-colors duration-200"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -74,6 +113,13 @@ const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted }) => {
             <label className="block text-sm font-medium text-white mb-3">
               How was your mentoring session?
             </label>
+            {mandatory && (
+              <div className="mb-3 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+                <p className="text-yellow-300 text-sm">
+                  ⚠️ Rating is required to complete your session. Please rate your experience before continuing.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-center space-x-2 mb-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -122,24 +168,26 @@ const RatingModal = ({ isOpen, onClose, session, onRatingSubmitted }) => {
 
           {/* Actions */}
           <div className="flex space-x-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex-1 btn-secondary"
-            >
-              Cancel
-            </button>
+            {!mandatory && (
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 btn-secondary"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               disabled={rating === 0 || loading}
-              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              className={`${mandatory ? 'w-full' : 'flex-1'} btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2`}
             >
               {loading ? (
                 <div className="loading-spinner w-4 h-4"></div>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Submit Rating</span>
+                  <span>{mandatory ? 'Submit Rating to Complete' : 'Submit Rating'}</span>
                 </>
               )}
             </button>

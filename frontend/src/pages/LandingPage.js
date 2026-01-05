@@ -7,26 +7,48 @@ import {
   Star, 
   ArrowRight,
   CheckCircle,
-  Play
+  Play,
+  Zap,
+  Award,
+  Target,
+  TrendingUp,
+  Clock,
+  Shield
 } from 'lucide-react';
 
 const LandingPage = () => {
   const features = [
     {
       icon: Users,
-      title: 'Peer-to-Peer Learning',
-      description: 'Connect with fellow students and experienced mentors'
+      title: 'Expert Peer Mentors',
+      description: 'Connect with top-performing students and industry professionals who understand your learning journey',
+      color: 'from-blue-500 to-cyan-500'
     },
     {
-      icon: BookOpen,
-      title: 'Expert Guidance',
-      description: 'Get help from top-performing students in your courses'
+      icon: Zap,
+      title: 'Instant Support',
+      description: 'Get real-time help through our advanced messaging system and live video sessions',
+      color: 'from-purple-500 to-pink-500'
     },
     {
-      icon: MessageCircle,
-      title: 'Real-time Support',
-      description: 'Instant messaging and live academic assistance'
+      icon: Target,
+      title: 'Personalized Learning',
+      description: 'AI-powered matching system connects you with mentors who specialize in your specific needs',
+      color: 'from-green-500 to-emerald-500'
+    },
+    {
+      icon: Award,
+      title: 'Proven Results',
+      description: 'Join thousands of students who have improved their grades and achieved their academic goals',
+      color: 'from-orange-500 to-red-500'
     }
+  ];
+
+  const stats = [
+    { number: '2,500+', label: 'Active Students', icon: Users },
+    { number: '500+', label: 'Expert Mentors', icon: Award },
+    { number: '10k+', label: 'Sessions Completed', icon: MessageCircle },
+    { number: '98%', label: 'Success Rate', icon: TrendingUp }
   ];
 
   const courses = [
@@ -35,28 +57,44 @@ const LandingPage = () => {
       mentor: 'Alex Chen',
       rating: 4.9,
       students: 234,
-      image: '/api/placeholder/300/200'
+      duration: '8 weeks',
+      level: 'Intermediate',
+      price: 'Free',
+      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400&h=250&fit=crop&crop=center',
+      tags: ['React', 'Next.js', 'JavaScript']
     },
     {
       title: 'Python for Data Science',
       mentor: 'Sarah Johnson',
       rating: 4.8,
       students: 189,
-      image: '/api/placeholder/300/200'
+      duration: '6 weeks',
+      level: 'Beginner',
+      price: 'Free',
+      image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=400&h=250&fit=crop&crop=center',
+      tags: ['Python', 'Data Science', 'ML']
     },
     {
-      title: 'UI/UX Design',
+      title: 'UI/UX Design Fundamentals',
       mentor: 'Mike Rodriguez',
       rating: 4.9,
       students: 156,
-      image: '/api/placeholder/300/200'
+      duration: '4 weeks',
+      level: 'Beginner',
+      price: 'Free',
+      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop&crop=center',
+      tags: ['Design', 'Figma', 'UX']
     },
     {
-      title: 'Cybersecurity Essentials',
-      mentor: 'Emily Davis',
-      rating: 4.7,
-      students: 203,
-      image: '/api/placeholder/300/200'
+      title: 'UI/UX Design Fundamentals',
+      mentor: 'Mike Rodriguez',
+      rating: 4.9,
+      students: 156,
+      duration: '4 weeks',
+      level: 'Beginner',
+      price: 'Free',
+      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop&crop=center',
+      tags: ['Design', 'Figma', 'UX']
     }
   ];
 
@@ -66,38 +104,73 @@ const LandingPage = () => {
       expertise: 'Full Stack Development',
       rating: 4.9,
       sessions: 150,
-      image: '/api/placeholder/80/80'
+      university: 'MIT',
+      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+      specialties: ['React', 'Node.js', 'AWS']
     },
     {
       name: 'Alex Rodriguez',
       expertise: 'Data Science & ML',
       rating: 4.8,
       sessions: 120,
-      image: '/api/placeholder/80/80'
+      university: 'Stanford',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+      specialties: ['Python', 'TensorFlow', 'Statistics']
     },
     {
       name: 'Jessica Kim',
       expertise: 'Product Design',
       rating: 4.9,
       sessions: 98,
-      image: '/api/placeholder/80/80'
+      university: 'RISD',
+      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+      specialties: ['Figma', 'User Research', 'Prototyping']
     },
     {
       name: 'David Park',
       expertise: 'DevOps & Cloud',
       rating: 4.7,
       sessions: 87,
-      image: '/api/placeholder/80/80'
+      university: 'UC Berkeley',
+      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+      specialties: ['Docker', 'Kubernetes', 'CI/CD']
     }
   ];
 
   const categories = [
-    { name: 'Web Development', icon: '💻', color: 'bg-blue-500' },
-    { name: 'Data Science', icon: '📊', color: 'bg-green-500' },
-    { name: 'Design', icon: '🎨', color: 'bg-purple-500' },
-    { name: 'Mobile Dev', icon: '📱', color: 'bg-orange-500' },
-    { name: 'AI & ML', icon: '🤖', color: 'bg-red-500' },
-    { name: 'Cybersecurity', icon: '🔒', color: 'bg-yellow-500' }
+    { name: 'Web Development', icon: '💻', color: 'bg-gradient-to-br from-blue-500 to-blue-600', count: '120+ mentors' },
+    { name: 'Data Science', icon: '📊', color: 'bg-gradient-to-br from-green-500 to-green-600', count: '85+ mentors' },
+    { name: 'Design', icon: '🎨', color: 'bg-gradient-to-br from-purple-500 to-purple-600', count: '65+ mentors' },
+    { name: 'Mobile Dev', icon: '📱', color: 'bg-gradient-to-br from-orange-500 to-orange-600', count: '45+ mentors' },
+    { name: 'AI & ML', icon: '🤖', color: 'bg-gradient-to-br from-red-500 to-red-600', count: '70+ mentors' },
+    { name: 'Cybersecurity', icon: '🔒', color: 'bg-gradient-to-br from-yellow-500 to-yellow-600', count: '35+ mentors' }
+  ];
+
+  const testimonials = [
+    {
+      name: 'Emily Johnson',
+      role: 'Computer Science Student',
+      university: 'Stanford University',
+      content: 'PeerLearn transformed my understanding of algorithms. My mentor Sarah was incredibly patient and helped me improve my coding skills dramatically.',
+      rating: 5,
+      image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=face'
+    },
+    {
+      name: 'Michael Chen',
+      role: 'Data Science Major',
+      university: 'MIT',
+      content: 'The personalized approach and real-time support made all the difference. I went from struggling with Python to landing a data science internship!',
+      rating: 5,
+      image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&crop=face'
+    },
+    {
+      name: 'Sofia Rodriguez',
+      role: 'Design Student',
+      university: 'RISD',
+      content: 'Amazing platform! The design mentors here are top-notch. I learned more in 2 months than I did in a whole semester.',
+      rating: 5,
+      image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100&h=100&fit=crop&crop=face'
+    }
   ];
 
   return (

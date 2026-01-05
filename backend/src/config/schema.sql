@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     scheduled_time TIMESTAMP WITH TIME ZONE,
     started_at TIMESTAMP WITH TIME ZONE,
     ended_at TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(20) DEFAULT 'requested' CHECK (status IN ('requested', 'active', 'completed', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'requested' CHECK (status IN ('requested', 'active', 'completed', 'cancelled', 'pending_rating')),
     summary TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -65,7 +65,12 @@ CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
+    text TEXT,
+    message_type VARCHAR(20) DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'file')),
+    file_url TEXT,
+    file_name TEXT,
+    file_size INTEGER,
+    file_type TEXT,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

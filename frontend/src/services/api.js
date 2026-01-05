@@ -117,6 +117,12 @@ export const chatAPI = {
   sendMessage: (messageData, token) => apiService.post('/chat/messages', messageData, {
     headers: { Authorization: `Bearer ${token}` }
   }),
+  uploadFile: (formData, token) => apiService.post('/chat/messages/upload', formData, {
+    headers: { 
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
   getMessages: (sessionId, params, token) => apiService.get(`/chat/messages/${sessionId}`, {
     params,
     headers: { Authorization: `Bearer ${token}` }

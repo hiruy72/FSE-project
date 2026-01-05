@@ -1,9 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const { query } = require('../config/database');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+const { initializeDatabase: initDB, query } = require('../config/database');
 
 const initializeDatabase = async () => {
   try {
+    console.log('🔧 Initializing database connection...');
+    
+    // Initialize database connection first
+    await initDB();
+    
     console.log('🔧 Initializing database schema...');
 
     // Read schema file
@@ -16,14 +22,19 @@ const initializeDatabase = async () => {
       .map(stmt => stmt.trim())
       .filter(stmt => stmt.length > 0);
 
+    console.log(`Found ${statements.length} SQL statements to execute`);
+
     // Execute each statement
     for (const statement of statements) {
       try {
         await query(statement);
+        console.log('✅ Executed statement successfully');
       } catch (error) {
         // Ignore errors for statements that might already exist
         if (!error.message.includes('already exists')) {
           console.error('Schema error:', error.message);
+        } else {
+          console.log('⚠️  Statement already exists, skipping');
         }
       }
     }
@@ -112,3 +123,16 @@ module.exports = {
   initializeDatabase,
   seedInitialData
 };
+
+// Run initialization if this file is executed directly
+if (require.main === module) {
+  initializeDatabase()
+    .then(() => {
+      console.log('Database initialization completed');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Database initialization failed:', error);
+      process.exit(1);
+    });
+}

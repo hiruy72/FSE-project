@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContextNew';
-import { userAPI, ratingAPI, sessionAPI } from '../services/api';
+import { userAPI, ratingAPI, sessionAPI, matchingAPI } from '../services/api';
 import socketService from '../services/socket';
 import { 
   Star, 
@@ -79,16 +79,20 @@ const MentorReviewPage = () => {
       const token = await getIdToken();
       
       // Fetch mentor profile
-      const mentorResponse = await userAPI.getUser(mentorId, token);
-      setMentor(mentorResponse.data);
+      const mentorResponse = await matchingAPI.getMentorDetails(mentorId);
+      const mentorData = mentorResponse.data.mentor;
+      setMentor(mentorData);
 
-      // Fetch mentor stats
-      const statsResponse = await ratingAPI.getMentorStats(mentorId);
-      setStats(statsResponse.data);
+      // Set stats from mentor data
+      setStats({
+        averageRating: mentorData.averageRating || 0,
+        totalRatings: mentorData.totalRatings || 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      });
 
-      // Fetch mentor ratings/reviews
-      const ratingsResponse = await ratingAPI.getMentorRatings(mentorId, { limit: 10 });
-      setRatings(ratingsResponse.data.ratings);
+      // Fetch recent ratings
+      const ratingsResponse = mentorResponse.data.recentRatings || [];
+      setRatings(ratingsResponse);
 
     } catch (error) {
       console.error('Error fetching mentor data:', error);
@@ -221,11 +225,11 @@ const MentorReviewPage = () => {
             <div className="text-center mb-6">
               <div className="w-24 h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-white font-bold text-2xl">
-                  {mentor.firstName?.[0]}{mentor.lastName?.[0]}
+                  {mentor.first_name?.[0]}{mentor.last_name?.[0]}
                 </span>
               </div>
               <h2 className="text-xl font-bold text-white mb-1">
-                {mentor.firstName} {mentor.lastName}
+                {mentor.first_name} {mentor.last_name}
               </h2>
               <p className="text-primary-500 font-medium mb-3">Expert Mentor</p>
               
@@ -240,12 +244,12 @@ const MentorReviewPage = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4 mb-6 pt-4 border-t border-dark-700">
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">150+</div>
+                <div className="text-2xl font-bold text-white">{mentor.totalSessions || 0}</div>
                 <div className="text-dark-400 text-sm">Sessions</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">98%</div>
-                <div className="text-dark-400 text-sm">Success Rate</div>
+                <div className="text-2xl font-bold text-white">{mentor.averageRating || 0}</div>
+                <div className="text-dark-400 text-sm">Avg Rating</div>
               </div>
             </div>
 
@@ -284,21 +288,23 @@ const MentorReviewPage = () => {
           <div className="card">
             <h3 className="text-xl font-semibold text-white mb-4">About</h3>
             <p className="text-dark-300 leading-relaxed mb-6">
-              {mentor.profile?.bio || 'Experienced mentor passionate about helping students achieve their academic goals. Specializing in computer science and software development with over 3 years of tutoring experience.'}
+              {mentor.bio || 'Experienced mentor passionate about helping students achieve their academic goals. Specializing in computer science and software development with over 3 years of tutoring experience.'}
             </p>
 
             {/* Skills */}
             <div className="mb-6">
               <h4 className="text-lg font-medium text-white mb-3">Expertise</h4>
               <div className="flex flex-wrap gap-2">
-                {mentor.profile?.skills?.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="bg-primary-600/20 text-primary-400 px-3 py-1 rounded-full text-sm"
-                  >
-                    {skill}
-                  </span>
-                )) || (
+                {mentor.skills && mentor.skills.length > 0 ? (
+                  mentor.skills.map((skill, index) => (
+                    <span
+                      key={index}
+                      className="bg-primary-600/20 text-primary-400 px-3 py-1 rounded-full text-sm"
+                    >
+                      {skill}
+                    </span>
+                  ))
+                ) : (
                   <span className="text-dark-400">No skills listed</span>
                 )}
               </div>
@@ -421,3 +427,4 @@ const MentorReviewPage = () => {
 };
 
 export default MentorReviewPage;
+

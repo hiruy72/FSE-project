@@ -11,7 +11,13 @@ import {
   MoreVertical,
   ArrowLeft,
   Clock,
-  User
+  User,
+  CheckCircle,
+  Paperclip,
+  Image,
+  File,
+  Download,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,9 +37,13 @@ const ChatPage = () => {
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (sessionId) {
@@ -83,32 +93,58 @@ const ChatPage = () => {
     try {
       const token = await getIdToken();
       
-      // Fetch session details
-      const activeSessionsResponse = await sessionAPI.getActiveSessions(token);
-      const currentSession = activeSessionsResponse.data.find(s => s.id === sessionId);
+      // Fetch session details - try active sessions first, then completed sessions
+      let currentSession = null;
+      
+      try {
+        const activeSessionsResponse = await sessionAPI.getActiveSessions(token);
+        currentSession = activeSessionsResponse.data.find(s => s.id === sessionId);
+      } catch (error) {
+        console.log('No active sessions found, checking completed sessions...');
+      }
+      
+      // If not found in active sessions, check completed sessions
+      if (!currentSession) {
+        try {
+          const completedSessionsResponse = await sessionAPI.getSessionLogs({}, token);
+          currentSession = completedSessionsResponse.data.find(s => s.id === sessionId);
+        } catch (error) {
+          console.log('Error fetching completed sessions:', error);
+        }
+      }
       
       if (currentSession) {
+        console.log('Session found:', currentSession);
         setSession(currentSession);
-        setSessionStartTime(new Date(currentSession.startedAt));
+        if (currentSession.startedAt) {
+          setSessionStartTime(new Date(currentSession.startedAt));
+        }
         
         // Check if session has a duration set
         if (currentSession.duration) {
           setSessionDuration(currentSession.duration);
         }
+      } else {
+        console.error('Session not found:', sessionId);
+        toast.error('Session not found');
+        navigate('/dashboard');
+        return;
       }
       
       // Fetch messages
       const messagesResponse = await chatAPI.getMessages(sessionId, {}, token);
       setMessages(messagesResponse.data);
 
-      // Connect to socket and join session room
-      socketService.connect();
-      socketService.joinSession(sessionId);
-      
-      // Set up socket listeners
-      socketService.onMessage(handleNewMessage);
-      socketService.onTyping(handleTyping);
-      socketService.onStopTyping(handleStopTyping);
+      // Connect to socket and join session room only for active sessions
+      if (currentSession.status === 'active') {
+        socketService.connect();
+        socketService.joinSession(sessionId);
+        
+        // Set up socket listeners
+        socketService.onMessage(handleNewMessage);
+        socketService.onTyping(handleTyping);
+        socketService.onStopTyping(handleStopTyping);
+      }
 
     } catch (error) {
       console.error('Error initializing chat:', error);
@@ -120,7 +156,14 @@ const ChatPage = () => {
   };
 
   const handleNewMessage = (message) => {
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => {
+      // Check if message already exists to prevent duplicates
+      const messageExists = prev.some(msg => msg.id === message.id);
+      if (messageExists) {
+        return prev;
+      }
+      return [...prev, message];
+    });
   };
 
   const handleTyping = (data) => {
@@ -195,7 +238,7 @@ const ChatPage = () => {
   };
 
   const handleSessionTimeExpired = async () => {
-    toast.warning('Session time has expired');
+    toast.error('Session time has expired');
     await endSession();
   };
 
@@ -206,12 +249,12 @@ const ChatPage = () => {
         summary: 'Session completed successfully'
       }, token);
       
-      toast.success('Session ended successfully');
-      
-      // Show rating modal for mentees
+      // For mentees, rating is mandatory - show modal and prevent navigation
       if (userData?.role === 'mentee') {
+        toast.success('Session ended. Please rate your experience.');
         setShowRatingModal(true);
       } else {
+        toast.success('Session ended successfully');
         navigate('/dashboard');
       }
     } catch (error) {
@@ -223,6 +266,78 @@ const ChatPage = () => {
   const handleRatingSubmitted = (rating) => {
     // Rating submitted successfully, navigate to dashboard
     navigate('/dashboard');
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size must be less than 10MB');
+        return;
+      }
+      
+      setSelectedFile(file);
+      setShowFilePreview(true);
+    }
+  };
+
+  const handleFileUpload = async (fileToUpload, messageText = '') => {
+    if (!fileToUpload) return;
+
+    setUploading(true);
+    
+    try {
+      const token = await getIdToken();
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('sessionId', sessionId);
+      if (messageText) {
+        formData.append('text', messageText);
+      }
+
+      await chatAPI.uploadFile(formData, token);
+      
+      // Clear file selection
+      setSelectedFile(null);
+      setShowFilePreview(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      toast.success('File uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSendWithFile = async () => {
+    if (selectedFile) {
+      await handleFileUpload(selectedFile, newMessage);
+      setNewMessage('');
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (fileType) => {
+    if (fileType?.startsWith('image/')) {
+      return <Image className="w-4 h-4" />;
+    }
+    return <File className="w-4 h-4" />;
+  };
+
+  const isImageFile = (fileType) => {
+    return fileType?.startsWith('image/');
   };
 
   const scrollToBottom = () => {
@@ -266,26 +381,46 @@ const ChatPage = () => {
                   {userData?.role === 'mentor' ? 'Student' : 'Mentor'}
                 </h2>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-dark-400">Online</span>
+                  {session?.status === 'completed' ? (
+                    <>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                      <span className="text-sm text-dark-400">
+                        Completed {session.endedAt ? new Date(session.endedAt).toLocaleDateString() : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-dark-400">Online</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <button className="p-2 text-dark-400 hover:text-white transition-colors duration-200">
-              <Phone className="w-5 h-5" />
-            </button>
-            <button className="p-2 text-dark-400 hover:text-white transition-colors duration-200">
-              <Video className="w-5 h-5" />
-            </button>
-            <button
-              onClick={endSession}
-              className="btn-primary text-sm px-4 py-2"
-            >
-              End Session
-            </button>
+            {session?.status !== 'completed' && (
+              <>
+                <button className="p-2 text-dark-400 hover:text-white transition-colors duration-200">
+                  <Phone className="w-5 h-5" />
+                </button>
+                <button className="p-2 text-dark-400 hover:text-white transition-colors duration-200">
+                  <Video className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={endSession}
+                  className="btn-primary text-sm px-4 py-2"
+                >
+                  End Session
+                </button>
+              </>
+            )}
+            {session?.status === 'completed' && (
+              <span className="text-sm text-green-400 font-medium">
+                Session Completed
+              </span>
+            )}
             <button className="p-2 text-dark-400 hover:text-white transition-colors duration-200">
               <MoreVertical className="w-5 h-5" />
             </button>
@@ -295,6 +430,22 @@ const ChatPage = () => {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Completed Session Banner */}
+        {session?.status === 'completed' && (
+          <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 mb-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-blue-400" />
+              <div>
+                <p className="text-blue-300 font-medium">Session Completed</p>
+                <p className="text-blue-400 text-sm">
+                  {session.endedAt && `Ended on ${new Date(session.endedAt).toLocaleString()}`}
+                  {session.duration && ` • Duration: ${session.duration} minutes`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {messages.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-dark-700 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -319,7 +470,47 @@ const ChatPage = () => {
                       : 'bg-dark-700 text-white'
                   }`}
                 >
-                  <p className="text-sm">{message.text}</p>
+                  {/* File/Image Message */}
+                  {message.messageType === 'image' && message.fileUrl && (
+                    <div className="mb-2">
+                      <img 
+                        src={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${message.fileUrl}`}
+                        alt={message.fileName || 'Shared image'}
+                        className="max-w-full h-auto rounded cursor-pointer"
+                        onClick={() => window.open(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${message.fileUrl}`, '_blank')}
+                      />
+                      {message.fileName && (
+                        <p className="text-xs mt-1 opacity-75">{message.fileName}</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {message.messageType === 'file' && message.fileUrl && (
+                    <div className="mb-2">
+                      <div className={`flex items-center space-x-2 p-2 rounded border ${
+                        isOwnMessage ? 'border-primary-400' : 'border-dark-600'
+                      }`}>
+                        {getFileIcon(message.fileType)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{message.fileName}</p>
+                          <p className="text-xs opacity-75">{formatFileSize(message.fileSize)}</p>
+                        </div>
+                        <a
+                          href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${message.fileUrl}`}
+                          download={message.fileName}
+                          className="p-1 hover:bg-black/20 rounded"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Text Message */}
+                  {message.text && message.text.trim() && (
+                    <p className="text-sm">{message.text}</p>
+                  )}
+                  
                   <p
                     className={`text-xs mt-1 ${
                       isOwnMessage ? 'text-primary-200' : 'text-dark-400'
@@ -350,29 +541,114 @@ const ChatPage = () => {
       </div>
 
       {/* Message Input */}
-      <div className="bg-dark-800 border-t border-dark-700 p-4">
-        <form onSubmit={sendMessage} className="flex space-x-4">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={handleInputChange}
-            placeholder="Type your message..."
-            className="flex-1 input-field"
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="btn-primary px-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            {sending ? (
-              <div className="loading-spinner w-4 h-4"></div>
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </button>
-        </form>
-      </div>
+      {session?.status !== 'completed' ? (
+        <div className="bg-dark-800 border-t border-dark-700 p-4">
+          {/* File Preview */}
+          {showFilePreview && selectedFile && (
+            <div className="mb-4 p-3 bg-dark-700 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-white">File Preview</h4>
+                <button
+                  onClick={() => {
+                    setShowFilePreview(false);
+                    setSelectedFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="text-dark-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                {isImageFile(selectedFile.type) ? (
+                  <div className="w-12 h-12 bg-dark-600 rounded flex items-center justify-center">
+                    <Image className="w-6 h-6 text-dark-400" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 bg-dark-600 rounded flex items-center justify-center">
+                    <File className="w-6 h-6 text-dark-400" />
+                  </div>
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{selectedFile.name}</p>
+                  <p className="text-xs text-dark-400">{formatFileSize(selectedFile.size)}</p>
+                </div>
+                
+                <button
+                  onClick={handleSendWithFile}
+                  disabled={uploading}
+                  className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <div className="loading-spinner w-4 h-4"></div>
+                  ) : (
+                    'Send File'
+                  )}
+                </button>
+              </div>
+              
+              {/* Optional message with file */}
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Add a message (optional)..."
+                className="w-full mt-3 input-field text-sm"
+              />
+            </div>
+          )}
+          
+          <form onSubmit={sendMessage} className="flex space-x-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+            />
+            
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-dark-400 hover:text-white transition-colors duration-200"
+              disabled={uploading}
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+            
+            <input
+              type="text"
+              value={newMessage}
+              onChange={handleInputChange}
+              placeholder="Type your message..."
+              className="flex-1 input-field"
+              disabled={sending || uploading}
+            />
+            
+            <button
+              type="submit"
+              disabled={!newMessage.trim() || sending || uploading}
+              className="btn-primary px-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {sending ? (
+                <div className="loading-spinner w-4 h-4"></div>
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-dark-800 border-t border-dark-700 p-4">
+          <div className="text-center text-dark-400">
+            <p className="text-sm">This session has been completed. You can review the conversation above.</p>
+          </div>
+        </div>
+      )}
 
       {/* Rating Modal */}
       <RatingModal
@@ -381,8 +657,9 @@ const ChatPage = () => {
           setShowRatingModal(false);
           navigate('/dashboard');
         }}
-        session={{ id: sessionId, mentorId: otherUser?.uid }}
+        session={{ id: sessionId, mentorId: session?.mentorId }}
         onRatingSubmitted={handleRatingSubmitted}
+        mandatory={userData?.role === 'mentee'}
       />
     </div>
   );
