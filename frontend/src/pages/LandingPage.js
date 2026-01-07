@@ -60,7 +60,7 @@ const LandingPage = () => {
       duration: '8 weeks',
       level: 'Intermediate',
       price: 'Free',
-      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400&h=250&fit=crop&crop=center',
+      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400&h=250&fit=crop',
       tags: ['React', 'Next.js', 'JavaScript']
     },
     {
@@ -71,7 +71,7 @@ const LandingPage = () => {
       duration: '6 weeks',
       level: 'Beginner',
       price: 'Free',
-      image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=400&h=250&fit=crop&crop=center',
+      image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=400&h=250&fit=crop',
       tags: ['Python', 'Data Science', 'ML']
     },
     {
@@ -82,19 +82,19 @@ const LandingPage = () => {
       duration: '4 weeks',
       level: 'Beginner',
       price: 'Free',
-      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop&crop=center',
+      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop',
       tags: ['Design', 'Figma', 'UX']
     },
     {
-      title: 'UI/UX Design Fundamentals',
-      mentor: 'Mike Rodriguez',
+      title: 'Web Development Bootcamp',
+      mentor: 'Emma Wilson',
       rating: 4.9,
-      students: 156,
-      duration: '4 weeks',
+      students: 312,
+      duration: '10 weeks',
       level: 'Beginner',
       price: 'Free',
-      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop&crop=center',
-      tags: ['Design', 'Figma', 'UX']
+      image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=250&fit=crop',
+      tags: ['HTML', 'CSS', 'JavaScript']
     }
   ];
 
@@ -105,7 +105,7 @@ const LandingPage = () => {
       rating: 4.9,
       sessions: 150,
       university: 'MIT',
-      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop',
       specialties: ['React', 'Node.js', 'AWS']
     },
     {
@@ -114,7 +114,7 @@ const LandingPage = () => {
       rating: 4.8,
       sessions: 120,
       university: 'Stanford',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
       specialties: ['Python', 'TensorFlow', 'Statistics']
     },
     {
@@ -123,7 +123,7 @@ const LandingPage = () => {
       rating: 4.9,
       sessions: 98,
       university: 'RISD',
-      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
       specialties: ['Figma', 'User Research', 'Prototyping']
     },
     {
@@ -132,7 +132,7 @@ const LandingPage = () => {
       rating: 4.7,
       sessions: 87,
       university: 'UC Berkeley',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop',
       specialties: ['Docker', 'Kubernetes', 'CI/CD']
     }
   ];
@@ -306,8 +306,14 @@ const LandingPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {courses.map((course, index) => (
-              <div key={index} className="bg-dark-800 rounded-lg overflow-hidden border border-dark-700 hover:border-dark-600 transition-colors duration-200">
-                <div className="h-48 bg-gradient-to-br from-primary-500 to-primary-700"></div>
+              <div key={index} className="bg-dark-800 rounded-lg overflow-hidden border border-dark-700 hover:border-dark-600 transition-colors duration-200 hover:shadow-lg hover:shadow-primary-500/20">
+                <div className="h-48 bg-gradient-to-br from-primary-500 to-primary-700 overflow-hidden">
+                  <img 
+                    src={course.image} 
+                    alt={course.title}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
                 <div className="p-6">
                   <h3 className="font-semibold text-white mb-2">{course.title}</h3>
                   <p className="text-dark-400 text-sm mb-4">by {course.mentor}</p>
@@ -335,8 +341,14 @@ const LandingPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {mentors.map((mentor, index) => (
-              <div key={index} className="bg-dark-900 rounded-lg p-6 text-center border border-dark-700">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full mx-auto mb-4"></div>
+              <div key={index} className="bg-dark-900 rounded-lg p-6 text-center border border-dark-700 hover:border-primary-500/50 transition-colors duration-200 hover:shadow-lg hover:shadow-primary-500/10">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full mx-auto mb-4 overflow-hidden border-2 border-primary-400">
+                  <img 
+                    src={mentor.image} 
+                    alt={mentor.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
                 <h3 className="font-semibold text-white mb-1">{mentor.name}</h3>
                 <p className="text-dark-400 text-sm mb-3">{mentor.expertise}</p>
                 <div className="flex items-center justify-center space-x-4 text-sm">
